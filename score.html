@@ -1,0 +1,1165 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HvL Predictor — Score Oracle</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #080c14;
+      --surface: #0d1422;
+      --card: #111827;
+      --border: #1e2d45;
+      --accent: #00e5ff;
+      --accent2: #ff6b35;
+      --accent3: #a855f7;
+      --gold: #ffd700;
+      --green: #22c55e;
+      --red: #ef4444;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --glow: 0 0 20px rgba(0,229,255,0.3);
+      --glow2: 0 0 20px rgba(255,107,53,0.3);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Outfit', sans-serif; 
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 10%, rgba(0,229,255,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(168,85,247,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 60% at 50% 50%, rgba(255,107,53,0.03) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Grid lines */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 860px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* HEADER */
+    header {
+      text-align: center;
+      margin-bottom: 3rem;
+      animation: fadeDown 0.8s ease both;
+    }
+
+    .logo-tag {
+      display: inline-block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 4px;
+      color: var(--accent);
+      text-transform: uppercase;
+      border: 1px solid rgba(0,229,255,0.3);
+      padding: 4px 12px;
+      border-radius: 2px;
+      margin-bottom: 1rem;
+      background: rgba(0,229,255,0.05);
+    }
+
+    header h1 {
+      font-family: 'Bebas Neue', sans-serif; 
+      font-size: clamp(3.5rem, 10vw, 6rem);
+      letter-spacing: 4px;
+      line-height: 0.95;
+      background: linear-gradient(135deg, var(--accent) 0%, #ffffff 40%, var(--accent2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 0 30px rgba(0,229,255,0.2));
+    }
+
+    header p {
+      margin-top: 0.8rem;
+      color: var(--muted);
+      font-size: 0.95rem;
+      font-weight: 300;
+      letter-spacing: 1px;
+    }
+
+    /* ROUNDS NAV */
+    .rounds-nav {
+      display: flex;
+      gap: 0.5rem;
+      justify-content: center;
+      margin-bottom: 2.5rem;
+      animation: fadeUp 0.6s 0.2s ease both;
+    }
+
+    .round-btn {
+      font-family: 'Bebas Neue', sans-serif; 
+      font-size: 1.1rem;
+      letter-spacing: 2px;
+      padding: 0.6rem 1.8rem;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--muted);
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .round-btn::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, var(--accent), var(--accent3));
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+
+    .round-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .round-btn.active {
+      border-color: var(--accent);
+      color: #000;
+      text-shadow: none;
+    }
+    .round-btn.active::before { opacity: 1; }
+    .round-btn.active span { position: relative; z-index: 1; }
+
+    /* CARD BASE */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.8rem;
+      margin-bottom: 1.5rem;
+      position: relative;
+      overflow: hidden;
+      animation: fadeUp 0.5s ease both;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+      opacity: 0.6;
+    }
+
+    .card-title {
+      font-family: 'Bebas Neue', sans-serif; 
+      font-size: 1.1rem;
+      letter-spacing: 3px;
+      color: var(--accent);
+      margin-bottom: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card-title .dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    /* TEAMS INPUT */
+    .teams-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 1rem;
+      align-items: center;
+    }
+
+    .team-block { display: flex; flex-direction: column; gap: 0.7rem; }
+
+    .team-label {
+      font-family: 'JetBrains Mono', monospace; 
+      font-size: 0.7rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    .team-label.higher { color: var(--accent); }
+    .team-label.lower { color: var(--accent2); }
+
+    .input-field {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.8rem 1rem;
+      color: var(--text);
+      font-family: 'Outfit', sans-serif;
+      font-size: 1rem;
+      width: 100%;
+      transition: all 0.2s;
+      outline: none;
+    }
+
+    .input-field:focus {
+      border-color: var(--accent);
+      background: rgba(0,229,255,0.05);
+      box-shadow: 0 0 0 3px rgba(0,229,255,0.1);
+    }
+
+    .input-field.orange:focus {
+      border-color: var(--accent2);
+      background: rgba(255,107,53,0.05);
+      box-shadow: 0 0 0 3px rgba(255,107,53,0.1);
+    }
+
+    .vs-badge {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2rem;
+      letter-spacing: 2px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-align: center;
+      filter: drop-shadow(0 0 10px rgba(0,229,255,0.3));
+    }
+
+    /* SCORES INPUT */
+    .scores-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.8rem;
+    }
+
+    .score-input-wrap {
+      position: relative;
+    }
+
+    .score-input-wrap label {
+      display: block;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+    }
+
+    .score-input-wrap input {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.65rem 0.9rem;
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1rem;
+      width: 100%;
+      transition: all 0.2s;
+      outline: none;
+      letter-spacing: 2px;
+    }
+
+    .score-input-wrap input:focus {
+      border-color: var(--gold);
+      background: rgba(255,215,0,0.05);
+      box-shadow: 0 0 0 3px rgba(255,215,0,0.1);
+    }
+
+    .score-rank {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(30%);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
+    }
+
+    /* PREDICT BUTTON */
+    .predict-btn {
+      width: 100%;
+      padding: 1.1rem;
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.4rem;
+      letter-spacing: 4px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, var(--accent) 0%, #0099bb 50%, var(--accent3) 100%);
+      color: #000;
+      margin-top: 0.5rem;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .predict-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(0,229,255,0.4);
+    }
+
+    .predict-btn:active { transform: translateY(0); }
+
+    .predict-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(255,255,255,0.15) 0%, transparent 100%);
+    }
+
+    .predict-btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    /* RESULTS SECTION */
+    #results {
+      display: none;
+      animation: fadeUp 0.6s ease both;
+    }
+
+    .result-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1.5rem;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .result-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.8rem;
+      letter-spacing: 3px;
+      color: var(--text);
+    }
+
+    .round-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 3px;
+      padding: 4px 12px;
+      border-radius: 2px;
+      background: rgba(0,229,255,0.1);
+      border: 1px solid rgba(0,229,255,0.3);
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    /* MAIN PREDICTION */
+    .main-pred-card {
+      background: linear-gradient(135deg, rgba(0,229,255,0.08) 0%, rgba(168,85,247,0.08) 100%);
+      border: 1px solid rgba(0,229,255,0.3);
+      border-radius: 12px;
+      padding: 2rem;
+      margin-bottom: 1rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .main-pred-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: radial-gradient(ellipse 60% 80% at 50% 0%, rgba(0,229,255,0.08) 0%, transparent 70%);
+    }
+
+    .pred-crown {
+      font-size: 1.5rem;
+      margin-right: 0.5rem;
+    }
+
+    .pred-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 4px;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 0.8rem;
+      position: relative;
+    }
+
+    .pred-score-main {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(3rem, 10vw, 5rem);
+      letter-spacing: 6px;
+      line-height: 1;
+      position: relative;
+      background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .pred-meta {
+      display: flex;
+      gap: 0.8rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+      position: relative;
+    }
+
+    .meta-pill {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 1px;
+      padding: 4px 12px;
+      border-radius: 20px;
+      border: 1px solid;
+    }
+
+    .pill-green { color: var(--green); border-color: rgba(34,197,94,0.3); background: rgba(34,197,94,0.08); }
+    .pill-gold { color: var(--gold); border-color: rgba(255,215,0,0.3); background: rgba(255,215,0,0.08); }
+    .pill-purple { color: var(--accent3); border-color: rgba(168,85,247,0.3); background: rgba(168,85,247,0.08); }
+    .pill-orange { color: var(--accent2); border-color: rgba(255,107,53,0.3); background: rgba(255,107,53,0.08); }
+    .pill-cyan { color: var(--accent); border-color: rgba(0,229,255,0.3); background: rgba(0,229,255,0.08); }
+
+    /* CONFIDENCE BAR */
+    .confidence-wrap {
+      margin-top: 1rem;
+      position: relative;
+    }
+
+    .confidence-label {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      letter-spacing: 2px;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+      text-transform: uppercase;
+    }
+
+    .confidence-bar {
+      height: 4px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .confidence-fill {
+      height: 100%;
+      border-radius: 2px;
+      background: linear-gradient(90deg, var(--accent), var(--accent3));
+      transition: width 1s cubic-bezier(0.23, 1, 0.32, 1);
+      box-shadow: 0 0 8px var(--accent);
+    }
+
+    /* ALT PREDICTIONS */
+    .alts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .alt-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.4rem;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .alt-card:hover {
+      border-color: var(--accent2);
+      transform: translateY(-2px);
+    }
+
+    .alt-card:nth-child(1)::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent2), transparent);
+    }
+
+    .alt-card:nth-child(2)::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent3), transparent);
+    }
+
+    .alt-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.6rem;
+    }
+
+    .alt-score {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 2.4rem;
+      letter-spacing: 4px;
+      color: var(--text);
+    }
+
+    /* STATS ROW */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .stat-box {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 1.2rem;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 1.8rem;
+      letter-spacing: 2px;
+      margin-bottom: 0.3rem;
+    }
+
+    .stat-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    /* ANALYSIS TABLE */
+    .analysis-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    .analysis-table th {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--muted);
+      padding: 0.6rem 0.8rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .analysis-table td {
+      padding: 0.7rem 0.8rem;
+      border-bottom: 1px solid rgba(30,45,69,0.5);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    .analysis-table tr:last-child td { border-bottom: none; }
+    .analysis-table tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .score-cell {
+      font-size: 1rem;
+      letter-spacing: 2px;
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .odd-cell { color: var(--gold); }
+
+    .prob-badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-size: 0.65rem;
+      letter-spacing: 1px;
+    }
+
+    .prob-high { background: rgba(34,197,94,0.15); color: var(--green); border: 1px solid rgba(34,197,94,0.3); }
+    .prob-med { background: rgba(255,215,0,0.12); color: var(--gold); border: 1px solid rgba(255,215,0,0.3); }
+    .prob-low { background: rgba(239,68,68,0.12); color: var(--red); border: 1px solid rgba(239,68,68,0.3); }
+
+    .winner-cell { color: var(--accent); }
+    .loser-cell { color: var(--accent2); }
+
+    .parity-yes { color: var(--green); }
+    .parity-no { color: var(--accent2); }
+
+    /* DISCLAIMER */
+    .disclaimer {
+      text-align: center;
+      padding: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 1px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+      line-height: 1.8;
+    }
+
+    /* ERROR */
+    .error-msg {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      border-radius: 8px;
+      padding: 0.8rem 1rem;
+      color: var(--red);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 1px;
+      margin-top: 0.5rem;
+      display: none;
+    }
+
+    /* LOADER */
+    .loader {
+      display: none;
+      justify-content: center;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 2rem;
+    }
+
+    .loader-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 1.2s infinite ease-in-out;
+    }
+
+    .loader-dot:nth-child(2) { animation-delay: 0.2s; background: var(--accent3); }
+    .loader-dot:nth-child(3) { animation-delay: 0.4s; background: var(--accent2); }
+
+    /* ANIMATIONS */
+    @keyframes fadeDown {
+      from { opacity: 0; transform: translateY(-20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes pulse {
+      0%, 80%, 100% { transform: scale(0.8); opacity: 0.5; }
+      40% { transform: scale(1.2); opacity: 1; }
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% center; }
+      100% { background-position: 200% center; }
+    }
+
+    /* RESET BTN */
+    .reset-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      padding: 0.4rem 1rem;
+      border-radius: 4px;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+
+    .reset-btn:hover { border-color: var(--accent2); color: var(--accent2); }
+
+    /* RESPONSIVE */
+    @media (max-width: 600px) {
+      .teams-grid { grid-template-columns: 1fr; }
+      .vs-badge { display: none; }
+      .scores-grid { grid-template-columns: 1fr 1fr; }
+      .alts-grid { grid-template-columns: 1fr; }
+     /* .stats-row { grid-template-columns: repeat(3, 1fr); } */
+      .stats-row { grid-template-columns: 1fr; }
+    }
+
+    /* SECTION DIVIDER */
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin: 1.5rem 0;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo-tag">⚡ Score Oracle v2.0</div>
+    <h1>HVL PREDICTOR</h1>
+    <p>Analyse des cotes · Prédiction de scores exacts · 3 tours</p>
+  </header>
+
+  <!-- ROUND SELECTOR -->
+  <div class="rounds-nav">
+    <button class="round-btn active" onclick="setRound(1)"><span>TOUR 1</span></button>
+    <button class="round-btn" onclick="setRound(2)"><span>TOUR 2</span></button>
+    <button class="round-btn" onclick="setRound(3)"><span>TOUR 3</span></button>
+  </div>
+
+  <!-- INPUT CARD: TEAMS & ODDS -->
+  <div class="card" style="animation-delay:0.1s">
+    <div class="card-title"><span class="dot"></span> COTES DE VICTOIRE</div>
+    <div class="teams-grid">
+      <div class="team-block">
+        <span class="team-label higher">▲ HIGHER (Favori)</span>
+        <input class="input-field" id="teamHigher" placeholder="Nom équipe Higher" maxlength="30" />
+        <input class="input-field" id="oddHigher" placeholder="Cote ex: 1.75" type="number" step="0.01" min="1" max="50" />
+      </div>
+      <div class="vs-badge">VS</div>
+      <div class="team-block">
+        <span class="team-label lower">▼ LOWER (Outsider)</span>
+        <input class="input-field orange" id="teamLower" placeholder="Nom équipe Lower" maxlength="30" />
+        <input class="input-field orange" id="oddLower" placeholder="Cote ex: 4.20" type="number" step="0.01" min="1" max="50" />
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUT CARD: SCORES -->
+  <div class="card" style="animation-delay:0.2s">
+    <div class="card-title"><span class="dot"></span> SCORES EXACTS PROPOSÉS <span style="color:var(--muted);font-size:0.7rem;font-family:'JetBrains Mono';letter-spacing:1px;margin-left:auto">Format: 2-1 / 1-2 / 3-0 / 0-3</span></div>
+    <div class="scores-grid">
+      <div class="score-input-wrap">
+        <label>Score #1 — Meilleure cote</label>
+        <input id="s1" placeholder="ex: 2-1" maxlength="6" oninput="formatScore(this)" />
+        <span class="score-rank">★</span>
+      </div>
+      <div class="score-input-wrap">
+        <label>Score #2</label>
+        <input id="s2" placeholder="ex: 1-2" maxlength="6" oninput="formatScore(this)" />
+      </div>
+      <div class="score-input-wrap">
+        <label>Score #3</label>
+        <input id="s3" placeholder="ex: 3-0" maxlength="6" oninput="formatScore(this)" />
+      </div>
+      <div class="score-input-wrap">
+        <label>Score #4</label>
+        <input id="s4" placeholder="ex: 0-3" maxlength="6" oninput="formatScore(this)" />
+      </div>
+    </div>
+    <div style="margin-top:0.8rem;">
+      <div class="scores-grid">
+        <div class="score-input-wrap">
+          <label>Cote Score #1</label>
+          <input id="c1" placeholder="ex: 6.50" type="number" step="0.01" min="1" max="999" />
+        </div>
+        <div class="score-input-wrap">
+          <label>Cote Score #2</label>
+          <input id="c2" placeholder="ex: 7.00" type="number" step="0.01" min="1" max="999" />
+        </div>
+        <div class="score-input-wrap">
+          <label>Cote Score #3</label>
+          <input id="c3" placeholder="ex: 8.50" type="number" step="0.01" min="1" max="999" />
+        </div>
+        <div class="score-input-wrap">
+          <label>Cote Score #4</label>
+          <input id="c4" placeholder="ex: 9.00" type="number" step="0.01" min="1" max="999" />
+        </div>
+      </div>
+    </div>
+    <div id="errorMsg" class="error-msg"></div>
+  </div>
+
+  <!-- PREDICT BUTTON -->
+  <button class="predict-btn" id="predictBtn" onclick="runPrediction()">
+    🔮 &nbsp; LANCER LA PRÉDICTION
+  </button>
+
+  <!-- LOADER -->
+  <div class="loader" id="loader">
+    <div class="loader-dot"></div>
+    <div class="loader-dot"></div>
+    <div class="loader-dot"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+
+    <div class="divider">RÉSULTATS DE L'ANALYSE</div>
+
+    <div class="result-header">
+      <div class="result-title">🎯 PRÉDICTION — <span id="resRound">TOUR 1</span></div>
+      <button class="reset-btn" onclick="resetResults()">↩ NOUVELLE ANALYSE</button>
+    </div>
+
+    <!-- STATS ROW -->
+    <div class="stats-row" id="statsRow"></div>
+
+    <!-- MAIN PREDICTION -->
+    <div class="main-pred-card" id="mainPredCard">
+      <div class="pred-label">👑 PRÉDICTION PRINCIPALE</div>
+      <div class="pred-score-main" id="mainScore">— — —</div>
+      <div class="pred-meta" id="mainMeta"></div>
+      <div class="confidence-wrap">
+        <div class="confidence-label">
+          <span>Niveau de confiance</span>
+          <span id="confPct">—%</span>
+        </div>
+        <div class="confidence-bar">
+          <div class="confidence-fill" id="confBar" style="width:0%"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALT PREDICTIONS -->
+    <div class="alts-grid" id="altsGrid"></div>
+
+    <!-- ANALYSIS TABLE -->
+    <div class="card" style="animation-delay:0.1s">
+      <div class="card-title"><span class="dot"></span> TABLEAU D'ANALYSE COMPLET</div>
+      <div style="overflow-x:auto">
+        <table class="analysis-table" id="analysisTable"></table>
+      </div>
+    </div>
+
+    <!-- DISCLAIMER -->
+    <div class="disclaimer">
+      ⚠️ CE SYSTÈME EST FOURNI À TITRE INFORMATIF UNIQUEMENT · LES PRÉDICTIONS SONT BASÉES SUR DES PROBABILITÉS MATHÉMATIQUES<br>
+      LE JEU PEUT ENTRAÎNER UNE DÉPENDANCE · JOUEZ DE MANIÈRE RESPONSABLE · +18
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+// ─────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────
+let currentRound = 1;
+
+function setRound(n) {
+  currentRound = n;
+  document.querySelectorAll('.round-btn').forEach((b, i) => {
+    b.classList.toggle('active', i + 1 === n);
+  });
+}
+
+// ─────────────────────────────────────────
+//  FORMAT SCORE INPUT
+// ─────────────────────────────────────────
+function formatScore(input) {
+  let v = input.value.replace(/[^0-9\-]/g, '');
+  // auto-insert dash
+  if (v.length === 1 && /[0-9]/.test(v)) {
+    // wait
+  } else if (v.length === 2 && !v.includes('-')) {
+    v = v[0] + '-' + v[1];
+  }
+  input.value = v;
+}
+
+// ─────────────────────────────────────────
+//  VALIDATION
+// ─────────────────────────────────────────
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = '⚠ ' + msg;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 5000);
+}
+
+function parseScore(str) {
+  str = str.trim();
+  const m = str.match(/^(\d+)-(\d+)$/);
+  if (!m) return null;
+  return { h: parseInt(m[1]), l: parseInt(m[2]) };
+}
+
+function isValidScore(s) {
+  if (!s) return false;
+  // No draws
+  if (s.h === s.l) return false;
+  // Max 5 goals each
+  if (s.h > 5 || s.l > 5) return false;
+  return true;
+}
+
+// ─────────────────────────────────────────
+//  CORE PREDICTION ENGINE
+// ─────────────────────────────────────────
+function impliedProb(odd) {
+  return 1 / odd;
+}
+
+function analyzeScores(scores, cotes, oddH, oddL) {
+  // 1. Implied win probabilities
+  const rawH = impliedProb(oddH);
+  const rawL = impliedProb(oddL);
+  const margin = rawH + rawL;
+  const probH = rawH / margin; // normalized
+  const probL = rawL / margin;
+
+  // 2. For each score: compute probability weight
+  const analyzed = scores.map((s, i) => {
+    if (!s) return null;
+    const odd = cotes[i];
+    const implProb = impliedProb(odd);
+
+    // Determine winner direction
+    const higherWins = s.h > s.l;
+    const directionProb = higherWins ? probH : probL;
+
+    // Goal total
+    const total = s.h + s.l;
+    const isEven = total % 2 === 0;
+
+    // Score "naturalness" — lower scores more likely
+    const naturalScore = 1 / (1 + 0.3 * (total - 2));
+
+    // Combined weight: direction strength × implied prob × natural
+    const weight = directionProb * implProb * naturalScore;
+
+    return {
+      score: s,
+      raw: `${s.h}-${s.l}`,
+      odd,
+      implProb,
+      directionProb,
+      higherWins,
+      total,
+      isEven,
+      weight,
+      rank: i + 1
+    };
+  }).filter(Boolean);
+
+  // 3. Sort by weight descending
+  analyzed.sort((a, b) => b.weight - a.weight);
+
+  // 4. Compute confidence for top score
+  const totalWeight = analyzed.reduce((acc, x) => acc + x.weight, 0);
+  analyzed.forEach(x => x.pct = Math.round((x.weight / totalWeight) * 100));
+
+  return { analyzed, probH, probL, margin };
+}
+
+function getProbLabel(w) {
+  if (w >= 35) return { cls: 'prob-high', label: 'FORT' };
+  if (w >= 20) return { cls: 'prob-med', label: 'MOYEN' };
+  return { cls: 'prob-low', label: 'FAIBLE' };
+}
+
+// ─────────────────────────────────────────
+//  MAIN FUNCTION
+// ─────────────────────────────────────────
+function runPrediction() {
+  document.getElementById('errorMsg').style.display = 'none';
+
+  const oddH = parseFloat(document.getElementById('oddHigher').value);
+  const oddL = parseFloat(document.getElementById('oddLower').value);
+  const tH = (document.getElementById('teamHigher').value.trim() || 'HIGHER').toUpperCase();
+  const tL = (document.getElementById('teamLower').value.trim() || 'LOWER').toUpperCase();
+
+  if (!oddH || !oddL || oddH < 1 || oddL < 1) {
+    showError('Veuillez saisir des cotes valides (≥ 1.00) pour les deux équipes.');
+    return;
+  }
+
+  // Collect scores
+  const scoreRaws = ['s1','s2','s3','s4'].map(id => document.getElementById(id).value);
+  const coteRaws = ['c1','c2','c3','c4'].map(id => parseFloat(document.getElementById(id).value));
+
+  const scores = [];
+  const cotes = [];
+
+  for (let i = 0; i < 4; i++) {
+    if (!scoreRaws[i] && !coteRaws[i]) continue; // skip empty
+    const s = parseScore(scoreRaws[i]);
+    if (!s) { showError(`Score #${i+1} invalide. Format attendu: X-Y (ex: 2-1)`); return; }
+    if (!isValidScore(s)) { showError(`Score #${i+1} invalide: pas de match nul et max 5 buts par équipe.`); return; }
+    if (!coteRaws[i] || coteRaws[i] < 1) { showError(`Cote du score #${i+1} invalide (doit être ≥ 1.00).`); return; }
+    scores.push(s);
+    cotes.push(coteRaws[i]);
+  }
+
+  if (scores.length < 2) {
+    showError('Entrez au minimum 2 scores exacts avec leurs cotes.');
+    return;
+  }
+
+  // Show loader
+  const btn = document.getElementById('predictBtn');
+  const loader = document.getElementById('loader');
+  btn.disabled = true;
+  loader.style.display = 'flex';
+  document.getElementById('results').style.display = 'none';
+
+  setTimeout(() => {
+    const { analyzed, probH, probL } = analyzeScores(scores, cotes, oddH, oddL);
+
+    loader.style.display = 'none';
+    btn.disabled = false;
+
+    renderResults(analyzed, probH, probL, tH, tL);
+  }, 1200);
+}
+
+// ─────────────────────────────────────────
+//  RENDER
+// ─────────────────────────────────────────
+function renderResults(analyzed, probH, probL, tH, tL) {
+  document.getElementById('resRound').textContent = `TOUR ${currentRound}`;
+
+  const top = analyzed[0];
+  const alt1 = analyzed[1];
+  const alt2 = analyzed[2] || null;
+
+  // ── Stats row ──
+  const favorLabel = probH > probL ? tH : tL;
+  const favorPct = Math.round(Math.max(probH, probL) * 100);
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-box">
+      <div class="stat-value" style="color:var(--accent)">${Math.round(probH*100)}%</div>
+      <div class="stat-label">${tH}<br>probabilité</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value" style="color:var(--gold)">${favorLabel}</div>
+      <div class="stat-label">favori<br>${favorPct}% win prob</div>
+    </div>
+    <div class="stat-box">
+      <div class="stat-value" style="color:var(--accent2)">${Math.round(probL*100)}%</div>
+      <div class="stat-label">${tL}<br>probabilité</div>
+    </div>
+  `;
+
+  // ── Main prediction ──
+  document.getElementById('mainScore').textContent = top.raw;
+  const confPct = Math.min(top.pct + 10, 95);
+  document.getElementById('confPct').textContent = `${confPct}%`;
+  setTimeout(() => {
+    document.getElementById('confBar').style.width = `${confPct}%`;
+  }, 100);
+
+  const parityLabel = top.isEven ? '✔ TOTAL PAIR' : '✖ TOTAL IMPAIR';
+  const parityCls = top.isEven ? 'pill-green' : 'pill-orange';
+  const winnerName = top.higherWins ? tH : tL;
+  document.getElementById('mainMeta').innerHTML = `
+    <span class="meta-pill pill-cyan">Total buts: ${top.total}</span>
+    <span class="meta-pill ${parityCls}">${parityLabel}</span>
+    <span class="meta-pill pill-gold">Vainqueur: ${winnerName}</span>
+    <span class="meta-pill pill-purple">Cote: ${top.odd}</span>
+  `;
+
+  // ── Alt predictions ──
+  const altItems = [alt1, alt2].filter(Boolean);
+  document.getElementById('altsGrid').innerHTML = altItems.map((a, idx) => {
+    const colors = ['var(--accent2)', 'var(--accent3)'];
+    const icons = ['🥈', '🥉'];
+    const aw = a.isEven ? '✔ PAIR' : '✖ IMPAIR';
+    const aname = a.higherWins ? tH : tL;
+    return `
+      <div class="alt-card">
+        <div class="alt-label">${icons[idx]} ALTERNATIVE ${idx+1}</div>
+        <div class="alt-score" style="color:${colors[idx]}">${a.raw}</div>
+        <div style="margin-top:0.6rem; display:flex; flex-wrap:wrap; gap:0.4rem">
+          <span class="meta-pill pill-cyan" style="font-size:0.6rem">Total: ${a.total}</span>
+          <span class="meta-pill ${a.isEven?'pill-green':'pill-orange'}" style="font-size:0.6rem">${aw}</span>
+          <span class="meta-pill pill-gold" style="font-size:0.6rem">${aname}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Fill missing alt slot
+  if (altItems.length === 1) {
+    document.getElementById('altsGrid').innerHTML +=
+      `<div class="alt-card" style="opacity:0.3;display:flex;align-items:center;justify-content:center;color:var(--muted);font-family:'JetBrains Mono';font-size:0.7rem;letter-spacing:2px">DONNÉES INSUFFISANTES</div>`;
+  }
+
+  // ── Analysis table ──
+  const tableHTML = `
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Score</th>
+        <th>Cote</th>
+        <th>Total</th>
+        <th>Parité</th>
+        <th>Vainqueur</th>
+        <th>Probabilité</th>
+        <th>Indice</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${analyzed.map((a, i) => {
+        const prob = getProbLabel(a.pct);
+        const winnerCls = a.higherWins ? 'winner-cell' : 'loser-cell';
+        const wName = a.higherWins ? tH : tL;
+        const isTop = i === 0;
+        return `<tr ${isTop ? 'style="background:rgba(0,229,255,0.05)"' : ''}>
+          <td style="color:var(--muted)">${i+1}${isTop ? ' 👑' : ''}</td>
+          <td class="score-cell">${a.raw}</td>
+          <td class="odd-cell">${a.odd}</td>
+          <td style="color:var(--text)">${a.total}</td>
+          <td class="${a.isEven?'parity-yes':'parity-no'}">${a.isEven ? 'PAIR ✔' : 'IMPAIR ✖'}</td>
+          <td class="${winnerCls}">${wName}</td>
+          <td><span class="prob-badge ${prob.cls}">${prob.label}</span></td>
+          <td style="color:var(--text);font-weight:700">${a.pct}%</td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  `;
+  document.getElementById('analysisTable').innerHTML = tableHTML;
+
+  // Show results
+  document.getElementById('results').style.display = 'block';
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ─────────────────────────────────────────
+//  RESET
+// ─────────────────────────────────────────
+function resetResults() {
+  document.getElementById('results').style.display = 'none';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+</script>
+</body>
+</html>
